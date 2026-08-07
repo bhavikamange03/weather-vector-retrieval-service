@@ -1,0 +1,56 @@
+# Databricks Job Configuration for Weather Data Ingestion
+# This job runs every 6 hours to keep weather data fresh
+
+resources:
+  jobs:
+    ingest_weather_embeddings:
+      name: "Weather Data Ingestion - Every 6 Hours"
+      
+      # Run every 6 hours
+      schedule:
+        quartz_cron_expression: "0 0 */6 * * ?"  # At minute 0, every 6 hours
+        timezone_id: "America/Los_Angeles"
+        pause_status: "UNPAUSED"
+      
+      # Email notifications on failure
+      email_notifications:
+        on_failure:
+          - ${workspace.current_user.userName}
+      
+      # Job configuration
+      max_concurrent_runs: 1
+      timeout_seconds: 3600  # 1 hour timeout
+      
+      tasks:
+        - task_key: "ingest_weather_data"
+          
+          # Use the Python script we created
+          python_file:
+            path: "${workspace.file_path}/resources/ingest_weather_embeddings_job.py"
+          
+          # Compute configuration
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 0  # Single-node cluster (driver only)
+            spark_conf:
+              "spark.master": "local[*]"
+              "spark.databricks.cluster.profile": "singleNode"
+            custom_tags:
+              "ResourceClass": "SingleNode"
+          
+          # Libraries needed
+          libraries:
+            - pypi:
+                package: "sentence-transformers"
+            - pypi:
+                package: "psycopg2-binary"
+            - pypi:
+                package: "sqlalchemy"
+            - pypi:
+                package: "requests"
+          
+          # Retry configuration
+          max_retries: 2
+          min_retry_interval_millis: 60000  # 1 minute
+          retry_on_timeout: true

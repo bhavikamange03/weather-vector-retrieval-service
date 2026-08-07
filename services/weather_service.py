@@ -1,4 +1,5 @@
 from lakebase import run_write
+from psycopg2.extras import Json
 
 from weather_client import (
     fetch_weather_documents
@@ -25,10 +26,16 @@ def sync_weather(locations, limit=50):
             location["state"]
 
         )
-
+        
 
         for doc in documents[:limit]:
+            print(doc)
+            print(type(doc))
 
+
+
+            for key, value in doc.items():
+                print(key, type(value))
 
             sql = """
 
@@ -74,7 +81,7 @@ def sync_weather(locations, limit=50):
                     doc["headline"],
                     doc["narrative_text"],
                     doc["issued_at"],
-                    doc["payload"]
+                    Json(doc["payload"])
                 )
             )
 

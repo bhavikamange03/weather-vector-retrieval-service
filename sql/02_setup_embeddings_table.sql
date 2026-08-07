@@ -1,12 +1,16 @@
-CREATE EXTENSION IF NOT EXISTS vector;
+DROP TABLE IF EXISTS weather_embeddings;
 
 
-CREATE TABLE IF NOT EXISTS weather_embeddings (
+CREATE TABLE weather_embeddings (
 
-    id SERIAL PRIMARY KEY,
+    id TEXT PRIMARY KEY,
 
     document_id TEXT REFERENCES weather_documents(id)
         ON DELETE CASCADE,
+
+    chunk_index INTEGER,
+
+    chunk_text TEXT,
 
     embedding VECTOR(384),
 
@@ -17,7 +21,7 @@ CREATE TABLE IF NOT EXISTS weather_embeddings (
 );
 
 
-CREATE INDEX IF NOT EXISTS idx_weather_embeddings_embedding
+CREATE INDEX idx_weather_embeddings_embedding
 
 ON weather_embeddings
 

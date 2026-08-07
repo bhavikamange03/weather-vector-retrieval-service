@@ -1,5 +1,7 @@
 # Weather Intelligence — Lakebase Vector Search
 
+> 📘 **Technical Design Document**: For detailed explanations of data source selection, schema decisions, chunking strategy, and known limitations, see **[README_WEATHER.md](README_WEATHER.md)**
+
 ## Overview
 
 Weather Intelligence is an end-to-end Retrieval-Augmented Generation (RAG) style pipeline that ingests unstructured weather data, stores it in Databricks Lakebase PostgreSQL, generates vector embeddings using Sentence Transformers, and enables semantic search using PostgreSQL pgvector.
@@ -156,20 +158,35 @@ weather-intelligence/
 ├── weather_client.py
 │
 ├── services/
-│   └── weather_service.py
+│   ├── weather_service.py
+│   └── weather_retriever.py
 │
 ├── notebooks/
-│   └── ingest_weather_embeddings.py
+│   ├── ingest_weather_embeddings.py
+│   ├── test_retriever.py
+│   └── hnsw_index_benchmark.py
+│
+├── resources/
+│   ├── ingest_weather_embeddings_job.py
+│   ├── ingest_weather_embeddings.job.yml
+│   └── README.md
 │
 ├── sql/
 │   ├── 01_setup_weather_documents_table.sql
 │   ├── 02_setup_weather_embeddings_table.sql
-│   └── 03_setup_weather_chunk_embeddings_table.sql
+│   ├── 03_setup_weather_chunk_embeddings_table.sql
+│   └── 04_hnsw_index_benchmark.sql
+│
+├── templates/
+│   └── weather_search.html
 │
 ├── README.md
-│
+├── README_WEATHER.md                        # Technical design document
+├── QUICKSTART.md                            # 5-minute setup guide
+├── HNSW_BENCHMARK.md                        # Vector index performance
 ├── requirements.txt
-└── app.yaml
+├── app.yaml
+└── databricks.yml
 ```
 
 ---
@@ -311,6 +328,54 @@ Chunk 2
 ```
 
 The overlap preserves context between chunks.
+
+---
+
+# Automated Data Refresh
+
+## Scheduled Ingestion Job
+
+The application includes a Databricks Job that automatically syncs weather data every 6 hours, ensuring your search results are always current.
+
+### Features:
+
+- **Automatic Scheduling**: Runs at 00:00, 06:00, 12:00, and 18:00 daily
+- **Multi-Source Ingestion**: Fetches alerts, forecasts, and forecast discussions
+- **Automatic Embedding**: Generates vector embeddings for all new content
+- **Error Handling**: Built-in retry logic and email notifications on failure
+- **Monitoring**: Detailed logs showing documents added, processing time, and metrics
+
+### Quick Start:
+
+```bash
+# Deploy the scheduled job
+databricks bundle deploy --target <your_target>
+
+# Verify it's running
+databricks jobs list --output JSON | grep "Weather Data Ingestion"
+
+# Manually trigger a run
+databricks jobs run-now --job-name "Weather Data Ingestion - Every 6 Hours"
+```
+
+### Configuration:
+
+The job is defined in `resources/ingest_weather_embeddings.job.yml`.
+
+To adjust the schedule (e.g., every 3 hours instead of 6):
+
+```yaml
+schedule:
+  quartz_cron_expression: "0 0 */3 * * ?"  # Every 3 hours
+```
+
+### Monitoring:
+
+- **Logs**: View in Databricks UI under Workflows → Jobs
+- **Metrics**: Each run reports documents added, embeddings generated, and duration
+- **Alerts**: Email notifications sent on job failure
+
+For detailed documentation, see `resources/README.md`.
 
 ---
 
@@ -522,8 +587,6 @@ The API returns the most semantically similar weather documents.
 
 - Location coordinates are currently provided by the API caller.
 - Only National Weather Service data is used.
-- No scheduled ingestion job is configured.
-- Search returns retrieved context without LLM-generated summaries.
 
 ---
 
@@ -532,8 +595,6 @@ The API returns the most semantically similar weather documents.
 Possible enhancements:
 
 - Add city name geocoding.
-- Add scheduled Databricks workflow for automatic weather updates.
-- Add RAG-based weather summaries using an LLM.
 - Support multiple weather data providers.
 - Add retrieval performance benchmarking.
 
